@@ -1,0 +1,1 @@
+# Light-Ring-position-frequency-Modified-Schwarzschild-
