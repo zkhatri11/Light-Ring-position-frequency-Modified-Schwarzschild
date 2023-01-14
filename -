@@ -1,0 +1,175 @@
+from sympy import *
+import math
+import scipy
+import numpy as np
+from sympy import init_printing
+from sympy import solve,symbols
+import inspect
+init_printing(use_unicode=True)
+import matplotlib.pyplot as plt
+
+#define the symbols
+M,t,r,theta,phi,C,r_a,l, w, Lr,s,G,p = symbols(" M t r theta phi C r_a l w Lr s G p")
+
+#define the coordinates
+coor = [t,r,theta,phi]
+
+#define the metric
+def m(i,j):
+    g00 = s**2*(-1+ (2*G*M/(r*s**2)) - C*r**(p-2))
+    g01 = 0
+    g02 = 0
+    g03 = 0
+    g10 = 0
+    g11 = 1/(1 - (2*G*M/(r*s**2)) + C*r**(p-2))
+    g12 = 0
+    g13 = 0
+    g20 = 0
+    g21 = 0
+    g22 = r**2
+    g23 = 0
+    g30 = 0
+    g31 = 0
+    g32 = 0
+    g33 = r**2
+    return ([[g00,g01,g02,g03],
+             [g10,g11,g12,g13],
+             [g20,g21,g22,g23],
+             [g30,g31,g32,g33]])[i][j]
+
+#define derivative of metric
+def dm(i,j,k):
+    return diff(m(i,j),coor[k])
+    
+#define inverse of metric
+def im(i,j):
+    K = Matrix([[m(0,0),m(0,1),m(0,2),m(0,3)],
+                [m(1,0),m(1,1),m(1,2),m(1,3)],
+                [m(2,0),m(2,1),m(2,2),m(2,3)],
+                [m(3,0),m(3,1),m(3,2),m(3,3)]])
+    return K.inv(method="LU")[i,j]
+    
+#define christoffel symbol
+def gamma(i,j,k):
+    s = 0
+    for l in range(4):
+        s+=0.5*im(i,l)*(dm(k,l,j)+dm(l,j,k)-dm(j,k,l))
+    return simplify(s)
+
+#print non zero elements
+for a in range(4):
+    for b in range(4):
+        for c in range(4):
+            if gamma(a,b,c)==0:
+                pass
+            else:
+                gamma(a,b,c).simplify()
+                #print("[",a,b,c,"] =",gamma(a,b,c))
+
+freq = solve(m(0,0) + 2*m(0,3)*w + m(3,3) * w**2, w)  #Null condition
+
+freq_1 = solve(gamma(1,0,0) + 2*gamma(1,0,3)*w + gamma(1,3,3)*w**2, w)    #Geodesic condition
+
+x = (freq[1]/p*2)**2
+y = (freq_1[1]/p*2)**2
+a = x-y
+sk = 299792458.
+Gk = 6.674*(10**(-11))
+#a1 = a.subs(l,0)
+#eqn=solve(a1,r)
+#C_vl = []
+#freqlist = []
+#C_values = []
+for i in range(-1,5):
+    print('p = ', i)
+    a1=a.subs(p,i)
+    b=solve(a1,r)
+    freq3 = freq[1].subs(l,i)
+    freq2=freq3/(p*2)
+    C_val = w-freq2
+    print(len(b))
+    if len(b) <= 2:
+        for k in range(len(b)):
+            print("nth root of r =", k, "=> RADIUS=",b[k])
+            C_val2 = C_val.subs(r,b[k])
+            C_val3 = solve(C_val2,C)
+            if bool(C_val3) == true:
+                C_val4 = C_val3[0].subs(w,97)
+                #C_val5 = C_val4.subs(w,97)
+                #C_val6 = C_val5.subs(G,Gk)
+                #C_values.append(C_val6)
+                print("=> C_values = ", C_val4)
+            x3 = freq2.subs(r,b[k])
+            #x2=x3.subs(s,sk)
+            #x1 = x2.subs(G,Gk)
+            #freqlist.append(x1)
+            print("=> FREQUENCY =", x3)
+
+def C_to_idx(c_val, c_arr):
+    return (np.abs(c_val - c_arr)).argmin()
+    
+# x axis values
+M0 = 1.989*(10**30) 
+v = np.linspace(10.,100.,100)
+M = v*M0
+
+#plots for p = 4 case (Schwarzschild- De Sitter)
+#C vs Mass plot for a particular frequency value
+
+C_val = 4.13296568439772e-12 - 6.71655604388937e+52/M**2
+
+plt.plot(v, C_val, color = 'black', label = r'$p = 4$')
+
+plt.xlabel("M/M0")
+plt.ylabel('C (Parameter)')
+plt.legend()
+plt.grid()
+plt.title('C - M plot')
+
+plt.show()
+
+#Frequency vs Mass plot for Schwarzschild - De Sitter (220 and 330 mode)
+
+C_app = np.linspace(-10.,10.,100)
+C = (C_app[1::] + C_app[:-1:])*0.5
+z={}
+for i in range(len(C)):
+    z[i] = 1.23655704483509e+34*(1.48885826823374e-53*C[i]*M**4 + M**2)**0.5/M**2
+    
+plt.plot(v, 2.5*z[C_to_idx(0, C)], color = 'red', label = r'$l = 2$')
+plt.plot(v, 3.5*z[C_to_idx(0., C)], color = 'green', label = r'$l = 3$')
+
+#plt.plot(M, z[C_to_idx(1., C)], color = 'orange', label = r'$c = 1$')
+#plt.plot(M, z[C_to_idx(2., C)], color = 'yellow', label = r'$c = 2$')
+#plt.plot(M, z[C_to_idx(3., C)], color = 'green', label = r'$c = 3$')
+#plt.plot(M, z[C_to_idx(4., C)], color = 'blue', label = r'$c = 4$')
+
+plt.axhline(y = 64, color = 'blue', linestyle = 'dotted')
+plt.axhline(y = 62, color = 'blue', linestyle = 'dashed')
+plt.axhline(y = 60.4, color = 'blue', linestyle = 'dotted')
+
+plt.axhline(y = 103.8, color = 'orange', linestyle = 'dotted')
+plt.axhline(y = 95.9, color = 'orange', linestyle = 'dashed')
+plt.axhline(y = 85.2, color = 'orange', linestyle = 'dotted')
+
+plt.vlines(150, 0, 103.8, color = 'purple', linestyle = 'dotted')
+plt.vlines(162, 0, 95.9, color = 'purple', linestyle = 'dashed')
+plt.vlines(183, 0, 85.2, color = 'purple', linestyle = 'dotted')
+
+plt.vlines(210, 0, 103.8, color = 'purple', linestyle = 'dotted')
+plt.vlines(227, 0, 95.9, color = 'purple', linestyle = 'dashed')
+plt.vlines(254, 0, 85.2, color = 'purple', linestyle = 'dotted')
+
+plt.vlines(249, 0, 64, color = 'brown', linestyle = 'dotted')
+plt.vlines(254, 0, 62, color = 'brown', linestyle = 'dashed')
+plt.vlines(258, 0, 60.4, color = 'brown', linestyle = 'dotted')
+
+plt.vlines(345, 0, 64, color = 'brown', linestyle = 'dotted')
+plt.vlines(351, 0, 62, color = 'brown', linestyle = 'dashed')
+plt.vlines(359, 0, 60.4, color = 'brown', linestyle = 'dotted')
+
+plt.legend()
+plt.xlabel('Mass of BH in solar masses (M0)')
+plt.ylabel('Frequeny(Hz)')
+plt.grid()
+plt.show()
